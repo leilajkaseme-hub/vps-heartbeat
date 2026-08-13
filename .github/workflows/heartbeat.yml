@@ -1,0 +1,19 @@
+name: heartbeat
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # every ~10 min (GitHub may delay under load)
+  workflow_dispatch: {}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the analytics box from outside
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 25 "${{ secrets.HEARTBEAT_URL }}" || echo 000)
+          echo "heartbeat HTTP $code"
+          if [ "$code" != "200" ]; then
+            curl -s -H "Title: Umami analytics DOWN (external check)" -H "Priority: high" -H "Tags: rotating_light" \
+              -d "GitHub external check got HTTP $code from the analytics box. The whole VPS may be down — check ServerCheap." \
+              "${{ secrets.NTFY_URL }}" || true
+            exit 1
+          fi
